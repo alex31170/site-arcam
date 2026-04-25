@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Visionneuse d'image</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    .viewer-wrap{max-width:1100px;margin:36px auto;padding:24px}
+    .viewer-img{display:block;max-width:100%;height:auto;margin:0 auto;border-radius:6px}
+    .viewer-back{position:fixed;right:18px;top:18px;background:var(--card);color:var(--text);padding:8px 12px;border-radius:6px;text-decoration:none}
+  </style>
+</head>
+<body>
+  <a class="viewer-back" id="back" href="index.html">Retour</a>
+  <div class="viewer-wrap">
+    <img id="img" class="viewer-img" src="" alt="image">
+  </div>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const img = params.get('img');
+    const el = document.getElementById('img');
+    if(img){
+      el.src = img;
+    } else {
+      el.alt = 'Aucune image spécifiée.'
+    }
+    // back button: prefer history.back when possible
+    const back = document.getElementById('back');
+    back.addEventListener('click', (e)=>{
+      // allow normal link fallback
+    });
+    // If there is a referrer, try history.back on load
+    if(document.referrer){
+      back.href = 'javascript:history.back()';
+    } else {
+      back.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
