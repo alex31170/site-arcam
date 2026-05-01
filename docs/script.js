@@ -75,7 +75,7 @@
     const children = state.page.children || [];
     const documents = state.page.documents || [];
     const childIllustrations = new Set(children.map((child) => child.image).filter(Boolean));
-    const showHeroImage = state.page.image && !isFolderIllustration(state.page.image, state.page.name);
+    const showHeroImage = state.page.image && (!isFolderIllustration(state.page.image, state.page.name) || state.pagePath === "EXPOSITION/GALERIE VIRTUELLE");
     const galleryImages = (state.page.gallery || []).filter((image) => {
       return image !== state.page.image && !childIllustrations.has(image);
     });
@@ -94,6 +94,7 @@
           ${showHeroImage ? `
             <div class="hero-media">
               <img src="${assetUrl(state.page.image)}" alt="${escapeHtml(formatTitle(state.page.name))}" loading="eager">
+              ${state.pagePath === "EXPOSITION/GALERIE VIRTUELLE" ? `<a href="https://framevr.io/arcammuratory"><img src="${assetUrl('Chez Vous .jpg')}" alt="Chez Vous" loading="eager"></a>` : ""}
             </div>
           ` : ""}
         </section>

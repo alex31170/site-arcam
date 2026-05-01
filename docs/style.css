@@ -159,6 +159,8 @@ img {
 }
 
 .hero-media {
+  display: flex;
+  gap: 20px;
   overflow: hidden;
   border-radius: 0;
   border: 0;
@@ -167,7 +169,7 @@ img {
 }
 
 .hero-media img {
-  width: 100%;
+  flex: 1;
   max-height: 620px;
   object-fit: contain;
   background: #ffffff;
