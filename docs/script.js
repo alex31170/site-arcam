@@ -104,9 +104,11 @@
               ${isVirtualGalleryPage ? `
                 <a class="hero-media-link" href="${pageUrl("EXPOSITION/GALERIE VIRTUELLE/Je m'expose chez vous")}">
                   <img src="${assetUrl(virtualGalleryChild?.image || "FRAME.jpg")}" alt="Je m'expose chez vous" loading="eager">
+                  <span>${escapeHtml("Je m'expose chez vous")}</span>
                 </a>
                 <a class="hero-media-link" href="https://framevr.io/arcammuratory" target="_blank" rel="noopener noreferrer">
                   <img src="${assetUrl("FRAME.jpg")}" alt="Visiter la galerie virtuelle Frame" loading="eager">
+                  <span>${escapeHtml("Galerie by My A")}</span>
                 </a>
               ` : ""}
             </div>
