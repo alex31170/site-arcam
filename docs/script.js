@@ -5,6 +5,142 @@ document.addEventListener('DOMContentLoaded',()=>{
     document.querySelector('.nav').classList.toggle('open')
   })
 
+  // On homepage, build a hero slideshow from all sub-gallery pages.
+  try{
+    const path = window.location.pathname || ''
+    const file = path.split('/').pop() || ''
+    const isHome = file === '' || file === 'index.html'
+
+    if(isHome){
+      const hero = document.querySelector('.hero')
+      const slideA = document.querySelector('.hero-slide-a')
+      const slideB = document.querySelector('.hero-slide-b')
+      const homeOriginalCandidates = Array.from(document.querySelectorAll('.gallery .card-thumb img'))
+        .map(img => img.getAttribute('src') || '')
+        .filter(Boolean)
+        .map(src => src.replace('/thumbs/', '/original/'))
+      const pageLinks = Array.from(document.querySelectorAll('.gallery .card-title'))
+        .map(a => a.getAttribute('href') || '')
+        .filter(Boolean)
+
+      if(hero && slideA && slideB){
+        const resolveRelative = (src, baseHref) => {
+          try{
+            const pageUrl = new URL(baseHref, window.location.href)
+            return new URL(src, pageUrl.href).href
+          }catch(e){
+            return src
+          }
+        }
+
+        const collectSourcesFromSubpage = async pageHref => {
+          try{
+            const response = await fetch(pageHref, { cache: 'no-store' })
+            if(!response.ok) return []
+            const html = await response.text()
+            const doc = new DOMParser().parseFromString(html, 'text/html')
+            // Keep only originals from viewer links (?img=assets/.../original/...).
+            return Array.from(doc.querySelectorAll('.gallery a[href*="viewer.html?img="]'))
+              .map(a => a.getAttribute('href') || '')
+              .map(href => {
+                try{
+                  const linkUrl = new URL(href, window.location.href)
+                  const imgParam = linkUrl.searchParams.get('img') || ''
+                  const decoded = decodeURIComponent(imgParam)
+                  if(!decoded.includes('/original/') && !decoded.includes('/orignal/')) return ''
+                  // Keep full nested path under original/orignal (all levels).
+                  return resolveRelative(decoded, pageHref)
+                }catch(e){
+                  return ''
+                }
+              })
+              .filter(Boolean)
+          }catch(e){
+            return []
+          }
+        }
+
+        const collectOriginalsFromHome = () => {
+          return Array.from(document.querySelectorAll('.gallery a[href*="viewer.html?img="]'))
+            .map(a => a.getAttribute('href') || '')
+            .map(href => {
+              try{
+                const linkUrl = new URL(href, window.location.href)
+                const imgParam = linkUrl.searchParams.get('img') || ''
+                const decoded = decodeURIComponent(imgParam)
+                if(!decoded.includes('/original/') && !decoded.includes('/orignal/')) return ''
+                return resolveRelative(decoded, window.location.href)
+              }catch(e){
+                return ''
+              }
+            })
+            .filter(Boolean)
+        }
+
+        const startSlideshow = sourceCandidates => {
+          const candidates = Array.from(new Set(sourceCandidates))
+
+          if(!candidates.length) return
+
+          const imageExists = src => new Promise(resolve => {
+            const probe = new Image()
+            probe.onload = () => resolve(true)
+            probe.onerror = () => resolve(false)
+            probe.src = src
+          })
+
+          // Keep order and skip missing files.
+          Promise.all(candidates.map(async src => {
+            if(await imageExists(src)) return src
+            return ''
+          })).then(results => {
+            const orderedSources = results.filter(Boolean)
+            if(!orderedSources.length) return
+
+            let activeSlide = slideA
+            let inactiveSlide = slideB
+            let currentIndex = 0
+
+            const setSlideSource = (slide, src) => {
+              slide.setAttribute('src', src)
+              slide.classList.add('is-visible')
+            }
+
+            setSlideSource(activeSlide, orderedSources[currentIndex])
+
+            if(orderedSources.length < 2) return
+            window.setInterval(()=>{
+              currentIndex = (currentIndex + 1) % orderedSources.length
+              inactiveSlide.setAttribute('src', orderedSources[currentIndex])
+              inactiveSlide.classList.add('is-visible')
+              activeSlide.classList.remove('is-visible')
+
+              const tmp = activeSlide
+              activeSlide = inactiveSlide
+              inactiveSlide = tmp
+            }, 2000)
+          })
+        }
+
+        if(!pageLinks.length){
+          startSlideshow(homeOriginalCandidates)
+          return
+        }
+
+        Promise.all(pageLinks.map(link => collectSourcesFromSubpage(link))).then(pageResults => {
+          // Strictly originals/orignal only. If subpage crawling fails (common on file://),
+          // fallback to original paths inferred from homepage thumbnails.
+          const fromSubpages = pageResults.flat()
+          const fromHomeViewerLinks = collectOriginalsFromHome()
+          const allOriginalCandidates = [...fromSubpages, ...fromHomeViewerLinks, ...homeOriginalCandidates]
+          startSlideshow(allOriginalCandidates)
+        }).catch(()=>{
+          startSlideshow(homeOriginalCandidates)
+        })
+      }
+    }
+  }catch(e){/* ignore */}
+
   // On subpages, arrange images intelligently by comparing natural widths
   try{
     const path = window.location.pathname || ''
