@@ -58,7 +58,7 @@
         </section>
         <section class="section">
           <div class="wrap">
-            <h2 class="section-title">Découvrir mon univers</h2>
+            <h2 class="section-title home-universe-title">Découvrir mon univers</h2>
             <div class="grid" id="children-grid"></div>
           </div>
         </section>
@@ -75,8 +75,13 @@
     const children = state.page.children || [];
     const documents = state.page.documents || [];
     const childIllustrations = new Set(children.map((child) => child.image).filter(Boolean));
-    const showHeroImage = state.page.image && (!isFolderIllustration(state.page.image, state.page.name) || state.pagePath === "EXPOSITION/GALERIE VIRTUELLE");
-    const galleryImages = (state.page.gallery || []).filter((image) => {
+    const isVirtualGalleryPage = state.pagePath === "EXPOSITION/GALERIE VIRTUELLE";
+    const isExpositionPage = state.pagePath === "EXPOSITION";
+    const heroImagePath = isExpositionPage ? "EXPOSITION/Expo en cours .jpg" : state.page.image;
+    const virtualGalleryChild = children.find((child) => child.path === "EXPOSITION/GALERIE VIRTUELLE/Je m'expose chez vous");
+    const displayChildren = isVirtualGalleryPage ? [] : children;
+    const showHeroImage = heroImagePath && !isVirtualGalleryPage && !isFolderIllustration(heroImagePath, state.page.name);
+    const galleryImages = isVirtualGalleryPage ? [] : (state.page.gallery || []).filter((image) => {
       return image !== state.page.image && !childIllustrations.has(image);
     });
 
@@ -88,17 +93,31 @@
       </nav>
       <main>
         <section class="wrap hero">
-          <div>
-            <h1>${escapeHtml(formatTitle(state.page.name))}</h1>
-          </div>
-          ${showHeroImage ? `
+          ${isExpositionPage ? "" : `
+            <div>
+              <h1>${escapeHtml(formatTitle(state.page.name))}</h1>
+            </div>
+          `}
+          ${(showHeroImage || isVirtualGalleryPage) ? `
             <div class="hero-media">
-              <img src="${assetUrl(state.page.image)}" alt="${escapeHtml(formatTitle(state.page.name))}" loading="eager">
-              ${state.pagePath === "EXPOSITION/GALERIE VIRTUELLE" ? `<a href="https://framevr.io/arcammuratory"><img src="${assetUrl('Chez Vous .jpg')}" alt="Chez Vous" loading="eager"></a>` : ""}
+              ${showHeroImage ? `<img src="${assetUrl(heroImagePath)}" alt="${escapeHtml(formatTitle(state.page.name))}" loading="eager">` : ""}
+              ${isVirtualGalleryPage ? `
+                <a class="hero-media-link" href="${pageUrl("EXPOSITION/GALERIE VIRTUELLE/Je m'expose chez vous")}">
+                  <img src="${assetUrl(virtualGalleryChild?.image || "FRAME.jpg")}" alt="Je m'expose chez vous" loading="eager">
+                </a>
+                <a class="hero-media-link" href="https://framevr.io/arcammuratory" target="_blank" rel="noopener noreferrer">
+                  <img src="${assetUrl("FRAME.jpg")}" alt="Visiter la galerie virtuelle Frame" loading="eager">
+                </a>
+              ` : ""}
+            </div>
+          ` : ""}
+          ${isExpositionPage ? `
+            <div>
+              <h1>${escapeHtml(formatTitle(state.page.name))}</h1>
             </div>
           ` : ""}
         </section>
-        ${children.length ? `
+        ${displayChildren.length ? `
           <section class="section">
             <div class="wrap">
               <div class="grid" id="children-grid"></div>
@@ -125,7 +144,7 @@
     const childrenGrid = document.getElementById("children-grid");
     const gallery = document.getElementById("gallery");
     if (childrenGrid) {
-      renderChildren(childrenGrid, children);
+      renderChildren(childrenGrid, displayChildren);
     }
     if (gallery) {
       renderGallery(gallery, galleryImages);
