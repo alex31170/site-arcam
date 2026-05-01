@@ -1,6 +1,6 @@
 ﻿{
     "title":  "",
-    "header":  "entete.png",
+    "header":  "entete alex.jpg",
     "path":  "",
     "name":  "Accueil",
     "image":  null,
@@ -289,10 +289,11 @@
                                               "path":  "Parcours/CV",
                                               "image":  "Parcours/CV.jpg",
                                               "gallery":  [
-
+                                                              "Parcours/CV/CV ARTISTE 25 Muratory_compressed-1.jpg",
+                                                              "Parcours/CV/CV ARTISTE 25 Muratory_compressed-2.jpg"
                                                           ],
                                               "documents":  [
-                                                                "Parcours/CV/CV ARTISTE 25 Muratory_compressed.pdf"
+
                                                             ],
                                               "children":  [
 

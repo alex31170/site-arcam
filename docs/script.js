@@ -1,240 +1,427 @@
-// Minimal script for navigation toggles (future use)
-document.addEventListener('DOMContentLoaded',()=>{
-  const navToggle=document.querySelector('.nav-toggle')
-  if(navToggle) navToggle.addEventListener('click',()=>{
-    document.querySelector('.nav').classList.toggle('open')
-  })
+(function () {
+  const state = {
+    data: null,
+    page: null,
+    rootPrefix: document.body.dataset.root || ".",
+    pagePath: normalizePath(document.body.dataset.path || ""),
+    carouselTimer: null
+  };
 
-  // On homepage, build a hero slideshow from all sub-gallery pages.
-  try{
-    const path = window.location.pathname || ''
-    const file = path.split('/').pop() || ''
-    const isHome = file === '' || file === 'index.html'
+  document.addEventListener("DOMContentLoaded", init);
 
-    if(isHome){
-      const hero = document.querySelector('.hero')
-      const slideA = document.querySelector('.hero-slide-a')
-      const slideB = document.querySelector('.hero-slide-b')
-      const homeOriginalCandidates = Array.from(document.querySelectorAll('.gallery .card-thumb img'))
-        .map(img => img.getAttribute('src') || '')
-        .filter(Boolean)
-        .map(src => src.replace('/thumbs/', '/original/'))
-      const pageLinks = Array.from(document.querySelectorAll('.gallery .card-title'))
-        .map(a => a.getAttribute('href') || '')
-        .filter(Boolean)
-
-      if(hero && slideA && slideB){
-        const resolveRelative = (src, baseHref) => {
-          try{
-            const pageUrl = new URL(baseHref, window.location.href)
-            return new URL(src, pageUrl.href).href
-          }catch(e){
-            return src
-          }
+  async function init() {
+    try {
+      if (window.SITE_DATA) {
+        state.data = window.SITE_DATA;
+      } else {
+        const response = await fetch(assetUrl("data.json"), { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("data.json introuvable");
         }
 
-        const collectSourcesFromSubpage = async pageHref => {
-          try{
-            const response = await fetch(pageHref, { cache: 'no-store' })
-            if(!response.ok) return []
-            const html = await response.text()
-            const doc = new DOMParser().parseFromString(html, 'text/html')
-            // Keep only originals from viewer links (?img=assets/.../original/...).
-            return Array.from(doc.querySelectorAll('.gallery a[href*="viewer.html?img="]'))
-              .map(a => a.getAttribute('href') || '')
-              .map(href => {
-                try{
-                  const linkUrl = new URL(href, window.location.href)
-                  const imgParam = linkUrl.searchParams.get('img') || ''
-                  const decoded = decodeURIComponent(imgParam)
-                  if(!decoded.includes('/original/') && !decoded.includes('/orignal/')) return ''
-                  // Keep full nested path under original/orignal (all levels).
-                  return resolveRelative(decoded, pageHref)
-                }catch(e){
-                  return ''
-                }
-              })
-              .filter(Boolean)
-          }catch(e){
-            return []
-          }
-        }
+        state.data = await response.json();
+      }
 
-        const collectOriginalsFromHome = () => {
-          return Array.from(document.querySelectorAll('.gallery a[href*="viewer.html?img="]'))
-            .map(a => a.getAttribute('href') || '')
-            .map(href => {
-              try{
-                const linkUrl = new URL(href, window.location.href)
-                const imgParam = linkUrl.searchParams.get('img') || ''
-                const decoded = decodeURIComponent(imgParam)
-                if(!decoded.includes('/original/') && !decoded.includes('/orignal/')) return ''
-                return resolveRelative(decoded, window.location.href)
-              }catch(e){
-                return ''
-              }
-            })
-            .filter(Boolean)
-        }
+      state.page = findPage(state.data, state.pagePath);
 
-        const startSlideshow = sourceCandidates => {
-          const candidates = Array.from(new Set(sourceCandidates))
+      if (!state.page) {
+        renderError("Page introuvable", "Le chemin demande n'existe pas dans data.json.");
+        return;
+      }
 
-          if(!candidates.length) return
+      render();
+    } catch (error) {
+      renderError("Impossible de charger le site", error.message);
+    }
+  }
 
-          const imageExists = src => new Promise(resolve => {
-            const probe = new Image()
-            probe.onload = () => resolve(true)
-            probe.onerror = () => resolve(false)
-            probe.src = src
-          })
+  function render() {
+    document.title = state.pagePath ? formatTitle(state.page.name) : "Accueil";
+    document.body.classList.toggle("dark-gallery-page", usesDarkGalleryTheme());
 
-          // Keep order and skip missing files.
-          Promise.all(candidates.map(async src => {
-            if(await imageExists(src)) return src
-            return ''
-          })).then(results => {
-            const orderedSources = results.filter(Boolean)
-            if(!orderedSources.length) return
+    if (state.pagePath === "") {
+      renderHome();
+      return;
+    }
 
-            let activeSlide = slideA
-            let inactiveSlide = slideB
-            let currentIndex = 0
+    renderFolder();
+  }
 
-            const setSlideSource = (slide, src) => {
-              slide.setAttribute('src', src)
-              slide.classList.add('is-visible')
-            }
+  function renderHome() {
+    document.body.innerHTML = `
+      <header class="site-header" id="site-header"></header>
+      <main>
+        <section class="section">
+          <div class="wrap">
+            <div class="carousel" id="carousel" aria-label="Images aleatoires"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="wrap">
+            <h2 class="section-title">Découvrir mon univers</h2>
+            <div class="grid" id="children-grid"></div>
+          </div>
+        </section>
+      </main>
+    `;
 
-            setSlideSource(activeSlide, orderedSources[currentIndex])
+    renderHeader();
+    renderChildren(document.getElementById("children-grid"), state.data.children || []);
+    startCarousel(document.getElementById("carousel"), collectImages(state.data));
+  }
 
-            if(orderedSources.length < 2) return
-            window.setInterval(()=>{
-              currentIndex = (currentIndex + 1) % orderedSources.length
-              inactiveSlide.setAttribute('src', orderedSources[currentIndex])
-              inactiveSlide.classList.add('is-visible')
-              activeSlide.classList.remove('is-visible')
+  function renderFolder() {
+    const parentPath = parentOf(state.pagePath);
+    const children = state.page.children || [];
+    const documents = state.page.documents || [];
+    const childIllustrations = new Set(children.map((child) => child.image).filter(Boolean));
+    const showHeroImage = state.page.image && !isFolderIllustration(state.page.image, state.page.name);
+    const galleryImages = (state.page.gallery || []).filter((image) => {
+      return image !== state.page.image && !childIllustrations.has(image);
+    });
 
-              const tmp = activeSlide
-              activeSlide = inactiveSlide
-              inactiveSlide = tmp
-            }, 2000)
-          })
-        }
+    document.body.innerHTML = `
+      <nav class="topbar">
+        <div class="wrap topbar-inner">
+          <a class="back-link" href="${pageUrl(parentPath)}" aria-label="Retour au dossier parent">Retour</a>
+        </div>
+      </nav>
+      <main>
+        <section class="wrap hero">
+          <div>
+            <h1>${escapeHtml(formatTitle(state.page.name))}</h1>
+          </div>
+          ${showHeroImage ? `
+            <div class="hero-media">
+              <img src="${assetUrl(state.page.image)}" alt="${escapeHtml(formatTitle(state.page.name))}" loading="eager">
+            </div>
+          ` : ""}
+        </section>
+        ${children.length ? `
+          <section class="section">
+            <div class="wrap">
+              <div class="grid" id="children-grid"></div>
+            </div>
+          </section>
+        ` : ""}
+        ${galleryImages.length ? `
+          <section class="section">
+            <div class="wrap">
+              <div class="gallery" id="gallery"></div>
+            </div>
+          </section>
+        ` : ""}
+        ${documents.length ? `
+          <section class="section">
+            <div class="wrap">
+              <div class="documents" id="documents"></div>
+            </div>
+          </section>
+        ` : ""}
+      </main>
+    `;
 
-        if(!pageLinks.length){
-          startSlideshow(homeOriginalCandidates)
-          return
-        }
+    const childrenGrid = document.getElementById("children-grid");
+    const gallery = document.getElementById("gallery");
+    if (childrenGrid) {
+      renderChildren(childrenGrid, children);
+    }
+    if (gallery) {
+      renderGallery(gallery, galleryImages);
+    }
+    const documentsContainer = document.getElementById("documents");
+    if (documentsContainer) {
+      renderDocuments(documentsContainer, documents);
+    }
+  }
 
-        Promise.all(pageLinks.map(link => collectSourcesFromSubpage(link))).then(pageResults => {
-          // Strictly originals/orignal only. If subpage crawling fails (common on file://),
-          // fallback to original paths inferred from homepage thumbnails.
-          const fromSubpages = pageResults.flat()
-          const fromHomeViewerLinks = collectOriginalsFromHome()
-          const allOriginalCandidates = [...fromSubpages, ...fromHomeViewerLinks, ...homeOriginalCandidates]
-          startSlideshow(allOriginalCandidates)
-        }).catch(()=>{
-          startSlideshow(homeOriginalCandidates)
-        })
+  function renderHeader() {
+    const header = document.getElementById("site-header");
+    const image = state.data.header || "entete.png";
+
+    header.innerHTML = `
+      <img class="header-image" src="${assetUrl(image)}" alt="" loading="eager">
+    `;
+  }
+
+  function renderChildren(container, children) {
+    if (!children.length) {
+      container.className = "empty";
+      container.textContent = "Aucun sous-dossier pour cette page.";
+      return;
+    }
+
+    container.innerHTML = children.map((child) => `
+      <a class="card" href="${pageUrl(child.path)}">
+        ${child.image ? `<img src="${assetUrl(child.image)}" alt="" loading="lazy">` : ""}
+        <span>${escapeHtml(formatTitle(child.name))}</span>
+      </a>
+    `).join("");
+  }
+
+  function renderGallery(container, images) {
+    if (!images.length) {
+      container.className = "empty";
+      container.textContent = "Aucune image supplementaire dans ce dossier.";
+      return;
+    }
+
+    container.innerHTML = images.map((image) => `
+      <a class="gallery-item" href="${assetUrl(image)}">
+        <img src="${assetUrl(image)}" alt="" loading="lazy">
+      </a>
+    `).join("");
+
+    setupJustifiedGallery(container);
+  }
+
+  function renderDocuments(container, documents) {
+    container.innerHTML = documents.map((documentPath) => {
+      const url = assetUrl(documentPath);
+      const name = normalizePath(documentPath).split("/").pop() || "Document PDF";
+
+      return `
+        <article class="document-viewer">
+          <iframe src="${url}" title="${escapeHtml(name)}"></iframe>
+          <a class="document-link" href="${url}">Ouvrir le PDF</a>
+        </article>
+      `;
+    }).join("");
+  }
+
+  function setupJustifiedGallery(container) {
+    const images = Array.from(container.querySelectorAll("img"));
+    let resizeTimer = null;
+
+    const layout = () => layoutJustifiedGallery(container);
+
+    images.forEach((image) => {
+      if (image.complete && image.naturalWidth) {
+        return;
+      }
+      image.addEventListener("load", layout, { once: true });
+      image.addEventListener("error", layout, { once: true });
+    });
+
+    layout();
+    window.addEventListener("resize", () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(layout, 120);
+    });
+  }
+
+  function layoutJustifiedGallery(container) {
+    const items = Array.from(container.querySelectorAll(".gallery-item"));
+    if (!items.length) {
+      return;
+    }
+
+    const isCvPage = state.pagePath === "Parcours/CV";
+    const gap = window.matchMedia("(max-width: 700px)").matches ? 16 : 22;
+    const targetHeight = (window.matchMedia("(max-width: 700px)").matches ? 180 : 260) * (isCvPage ? 3.5 : 1);
+    const minHeight = (window.matchMedia("(max-width: 700px)").matches ? 145 : 210) * (isCvPage ? 3.5 : 1);
+    const maxHeight = (window.matchMedia("(max-width: 700px)").matches ? 240 : 340) * (isCvPage ? 3.5 : 1);
+    const availableWidth = container.clientWidth || container.getBoundingClientRect().width;
+    const rows = [];
+    let row = [];
+    let aspectSum = 0;
+
+    items.forEach((item) => {
+      const image = item.querySelector("img");
+      const aspect = image && image.naturalWidth && image.naturalHeight
+        ? image.naturalWidth / image.naturalHeight
+        : 1;
+
+      row.push({ item, aspect });
+      aspectSum += aspect;
+
+      const widthAtTarget = aspectSum * targetHeight + gap * (row.length - 1);
+      if (isCvPage || row.length === 3 || widthAtTarget >= availableWidth * 0.92) {
+        rows.push(row);
+        row = [];
+        aspectSum = 0;
+      }
+    });
+
+    if (row.length) {
+      rows.push(row);
+    }
+
+    container.innerHTML = "";
+
+    rows.forEach((rowItems) => {
+      const rowAspect = rowItems.reduce((sum, entry) => sum + entry.aspect, 0);
+      const rowGap = gap * (rowItems.length - 1);
+      const fittedHeight = (availableWidth - rowGap) / rowAspect;
+      const height = Math.max(minHeight, Math.min(maxHeight, fittedHeight));
+      const rowElement = document.createElement("div");
+
+      rowElement.className = "gallery-row";
+      rowItems.forEach(({ item, aspect }) => {
+        item.style.width = `${Math.round(height * aspect)}px`;
+        item.style.height = `${Math.round(height)}px`;
+        item.style.flex = "0 0 auto";
+        rowElement.appendChild(item);
+      });
+
+      container.appendChild(rowElement);
+    });
+  }
+
+  function startCarousel(container, images) {
+    const shuffled = shuffle(images).slice(0, Math.min(images.length, 36));
+
+    if (!shuffled.length) {
+      container.className = "empty";
+      container.textContent = "Aucune image disponible pour le carousel.";
+      return;
+    }
+
+    container.innerHTML = `
+      <img class="is-active" src="${assetUrl(shuffled[0].src)}" alt="" loading="eager">
+      <img src="" alt="" loading="eager">
+    `;
+
+    const slides = container.querySelectorAll("img");
+    let current = 0;
+    let visible = 0;
+
+    state.carouselTimer = setInterval(() => {
+      current = (current + 1) % shuffled.length;
+      visible = 1 - visible;
+      const next = slides[visible];
+      const previous = slides[1 - visible];
+
+      next.src = assetUrl(shuffled[current].src);
+      next.classList.add("is-active");
+      previous.classList.remove("is-active");
+    }, 3000);
+  }
+
+  function collectImages(node, trail = []) {
+    const label = [...trail, node.name].filter(Boolean).join(" / ");
+    const images = [];
+
+    if (node.image) {
+      images.push({ src: node.image, label: label || node.name || "Accueil" });
+    }
+
+    for (const image of node.gallery || []) {
+      images.push({ src: image, label: label || node.name || "Image" });
+    }
+
+    for (const child of node.children || []) {
+      images.push(...collectImages(child, [...trail, node.name].filter(Boolean)));
+    }
+
+    return images;
+  }
+
+  function findPage(node, path) {
+    if (normalizePath(node.path || "") === path) {
+      return node;
+    }
+
+    for (const child of node.children || []) {
+      const found = findPage(child, path);
+      if (found) {
+        return found;
       }
     }
-  }catch(e){/* ignore */}
 
-  // On subpages, arrange images intelligently by comparing natural widths
-  try{
-    const path = window.location.pathname || ''
-    const file = path.split('/').pop() || ''
-    if(file !== 'index.html'){
-      const imgEls = Array.from(document.querySelectorAll('.gallery a img'))
-      if(imgEls.length){
-        // Wait until all images have loaded to read natural sizes
-        const whenAllLoaded = imgEls.map(img => new Promise(resolve => {
-          if(img.complete) return resolve(img)
-          img.addEventListener('load', ()=> resolve(img))
-          img.addEventListener('error', ()=> resolve(img))
-        }))
-        Promise.all(whenAllLoaded).then(imgs => {
-          const widths = imgs.map(i => i.naturalWidth || 0).filter(w=>w>0)
-          const ratios = imgs.map(i => (i.naturalWidth && i.naturalHeight) ? (i.naturalWidth / i.naturalHeight) : 0).filter(r=>r>0)
-          if(!widths.length || !ratios.length) return
-          // medians
-          widths.sort((a,b)=>a-b)
-          ratios.sort((a,b)=>a-b)
-          const midW = Math.floor(widths.length/2)
-          const medianW = widths.length%2 ? widths[midW] : (widths[midW-1]+widths[midW])/2
-          const midR = Math.floor(ratios.length/2)
-          const medianR = ratios.length%2 ? ratios[midR] : (ratios[midR-1]+ratios[midR])/2
-          // thresholds
-          const WIDTH_THRESH = 1.4
-          const RATIO_THRESH = Math.max(1.8, medianR * 1.5)
-          imgs.forEach(img => {
-            const w = img.naturalWidth || 0
-            const r = (img.naturalWidth && img.naturalHeight) ? img.naturalWidth / img.naturalHeight : 0
-            if(w > medianW * WIDTH_THRESH || r > RATIO_THRESH){
-              const a = img.closest('a')
-              if(a) a.classList.add('gallery-large')
-            }
-          })
+    return null;
+  }
 
-          // Reorder gallery deterministically to avoid single-image rows
-          const gallery = document.querySelector('.gallery')
-          if(gallery){
-            const reorderGallery = () => {
-              const items = Array.from(gallery.querySelectorAll(':scope > a'))
-              if(!items.length) return
+  function pageUrl(path) {
+    const cleanPath = normalizePath(path);
+    if (!cleanPath) {
+      return assetUrl("index.html");
+    }
 
-              const isWide = el => el.classList.contains('gallery-large') || el.classList.contains('gallery-wide')
-              const head = []
-              const wides = []
-              const tail = []
-              let buffer = []
+    return assetUrl(`${encodePath(cleanPath)}/index.html`);
+  }
 
-              const flushBufferToHead = () => { if(buffer.length === 3){ head.push(...buffer); buffer = [] } }
-              const flushBufferToTail = () => { if(buffer.length){ tail.push(...buffer); buffer = [] } }
+  function assetUrl(path) {
+    const prefix = state.rootPrefix === "." ? "." : state.rootPrefix.replace(/\/$/, "");
+    return `${prefix}/${encodePath(path)}`;
+  }
 
-              for(const it of items){
-                if(isWide(it)){
-                  // if buffer has incomplete row, move it to tail so we don't create a single-item row before a wide
-                  if(buffer.length && buffer.length !== 3){ flushBufferToTail() }
-                  // if buffer has full row, move to head
-                  if(buffer.length === 3){ flushBufferToHead() }
-                  buffer = []
-                  wides.push(it)
-                }else{
-                  buffer.push(it)
-                  if(buffer.length === 3){ flushBufferToHead() }
-                }
-              }
+  function encodePath(path) {
+    return normalizePath(path)
+      .split("/")
+      .map((part) => encodeURIComponent(decodeRepeated(part)))
+      .join("/");
+  }
 
-              // leftover buffer -> tail
-              if(buffer.length){ flushBufferToTail() }
+  function parentOf(path) {
+    const parts = normalizePath(path).split("/").filter(Boolean);
+    parts.pop();
+    return parts.join("/");
+  }
 
-              const newOrder = []
-              newOrder.push(...head)
-              newOrder.push(...wides)
-              newOrder.push(...tail)
+  function normalizePath(path) {
+    return decodeRepeated(String(path || "").replace(/\\/g, "/")).replace(/^\/+|\/+$/g, "");
+  }
 
-              // Apply only if changed
-              let changed = false
-              if(newOrder.length === gallery.children.length){
-                for(let i=0;i<newOrder.length;i++){
-                  if(gallery.children[i] !== newOrder[i]){ changed = true; break }
-                }
-              }else{ changed = true }
-              if(changed){ newOrder.forEach(n => gallery.appendChild(n)) }
-            }
-
-            // run after small delay to ensure layout is stable
-            setTimeout(reorderGallery, 120)
-            let resizeTimer = null
-            window.addEventListener('resize', ()=>{
-              clearTimeout(resizeTimer)
-              resizeTimer = setTimeout(reorderGallery, 160)
-            })
-          }
-        })
+  function decodeRepeated(value) {
+    let decoded = String(value || "");
+    for (let i = 0; i < 3; i += 1) {
+      try {
+        const next = decodeURIComponent(decoded);
+        if (next === decoded) {
+          break;
+        }
+        decoded = next;
+      } catch (error) {
+        break;
       }
     }
-  }catch(e){/* ignore */}
-})
+    return decoded;
+  }
+
+  function isFolderIllustration(imagePath, folderName) {
+    const fileName = normalizePath(imagePath).split("/").pop() || "";
+    const baseName = fileName.replace(/\.[^.]+$/, "");
+    return baseName.toLocaleLowerCase("fr-FR") === String(folderName || "").toLocaleLowerCase("fr-FR");
+  }
+
+  function usesDarkGalleryTheme() {
+    const path = state.pagePath.toLocaleLowerCase("fr-FR");
+    return path === "parcours/cv"
+      || path.startsWith("peinture/")
+      || path === "sculpture"
+      || path === "exposition/galerie virtuelle/je m'expose chez vous";
+  }
+
+  function shuffle(items) {
+    const copy = [...items];
+    for (let i = copy.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    return copy;
+  }
+
+  function escapeHtml(value) {
+    return String(value || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function formatTitle(value) {
+    const text = String(value || "").trim().toLocaleLowerCase("fr-FR");
+    return text ? text.charAt(0).toLocaleUpperCase("fr-FR") + text.slice(1) : "";
+  }
+
+  function renderError(title, message) {
+    document.body.innerHTML = `
+      <main class="wrap section">
+        <h1 class="section-title">${escapeHtml(title)}</h1>
+        <p class="lead">${escapeHtml(message)}</p>
+      </main>
+    `;
+  }
+})();

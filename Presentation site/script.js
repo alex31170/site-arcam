@@ -216,10 +216,11 @@
       return;
     }
 
+    const isCvPage = state.pagePath === "Parcours/CV";
     const gap = window.matchMedia("(max-width: 700px)").matches ? 16 : 22;
-    const targetHeight = window.matchMedia("(max-width: 700px)").matches ? 180 : 260;
-    const minHeight = window.matchMedia("(max-width: 700px)").matches ? 145 : 210;
-    const maxHeight = window.matchMedia("(max-width: 700px)").matches ? 240 : 340;
+    const targetHeight = (window.matchMedia("(max-width: 700px)").matches ? 180 : 260) * (isCvPage ? 3.5 : 1);
+    const minHeight = (window.matchMedia("(max-width: 700px)").matches ? 145 : 210) * (isCvPage ? 3.5 : 1);
+    const maxHeight = (window.matchMedia("(max-width: 700px)").matches ? 240 : 340) * (isCvPage ? 3.5 : 1);
     const availableWidth = container.clientWidth || container.getBoundingClientRect().width;
     const rows = [];
     let row = [];
@@ -235,7 +236,7 @@
       aspectSum += aspect;
 
       const widthAtTarget = aspectSum * targetHeight + gap * (row.length - 1);
-      if (row.length === 3 || widthAtTarget >= availableWidth * 0.92) {
+      if (isCvPage || row.length === 3 || widthAtTarget >= availableWidth * 0.92) {
         rows.push(row);
         row = [];
         aspectSum = 0;
@@ -386,7 +387,8 @@
 
   function usesDarkGalleryTheme() {
     const path = state.pagePath.toLocaleLowerCase("fr-FR");
-    return path.startsWith("peinture/")
+    return path === "parcours/cv"
+      || path.startsWith("peinture/")
       || path === "sculpture"
       || path === "exposition/galerie virtuelle/je m'expose chez vous";
   }
