@@ -23,7 +23,7 @@
                                          "EXPOSITION/2024 \u0026 avant.png",
                                          "EXPOSITION/2025.png",
                                          "EXPOSITION/2026.png",
-                                         "EXPOSITION/GALERIE VIRTUELLE.jpg"
+                                         "EXPOSITION/2025.png"
                                      ],
                          "documents":  [
 
@@ -123,7 +123,7 @@
                                           {
                                               "name":  "GALERIE VIRTUELLE",
                                               "path":  "EXPOSITION/GALERIE VIRTUELLE",
-                                              "image":  "EXPOSITION/GALERIE VIRTUELLE.jpg",
+                                              "image":  "EXPOSITION/2025.png",
                                               "gallery":  [
 
                                                           ],
@@ -348,7 +348,7 @@
                                        ],
                          "children":  [
                                           {
-                                              "name":  "Inspiration Japon",
+                                              "name":  "Japon",
                                               "path":  "PEINTURE/Inspiration Japon",
                                               "image":  "PEINTURE/Inspiration Japon.jpg",
                                               "gallery":  [
@@ -402,7 +402,7 @@
                                                            ]
                                           },
                                           {
-                                              "name":  "Inspiration Mer",
+                                              "name":  "Prendre le large",
                                               "path":  "PEINTURE/Inspiration Mer",
                                               "image":  "PEINTURE/Inspiration Mer.jpg",
                                               "gallery":  [
@@ -469,7 +469,7 @@
                                                            ]
                                           },
                                           {
-                                              "name":  "Inspiration Voyage",
+                                              "name":  "Evasion",
                                               "path":  "PEINTURE/Inspiration Voyage",
                                               "image":  "PEINTURE/Inspiration Voyage.png",
                                               "gallery":  [

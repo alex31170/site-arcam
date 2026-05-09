@@ -79,7 +79,7 @@
     const isExpositionPage = state.pagePath === "EXPOSITION";
     const heroImagePath = isExpositionPage ? "EXPOSITION/Expo en cours .jpg" : state.page.image;
     const virtualGalleryChild = children.find((child) => child.path === "EXPOSITION/GALERIE VIRTUELLE/Je m'expose chez vous");
-    const displayChildren = isVirtualGalleryPage ? [] : children;
+    const displayChildren = isVirtualGalleryPage ? [] : orderExpositionChildren(children, isExpositionPage);
     const showHeroImage = heroImagePath && !isVirtualGalleryPage && !isFolderIllustration(heroImagePath, state.page.name);
     const galleryImages = isVirtualGalleryPage ? [] : (state.page.gallery || []).filter((image) => {
       return image !== state.page.image && !childIllustrations.has(image);
@@ -194,6 +194,25 @@
     `).join("");
   }
 
+  function orderExpositionChildren(children, isExpositionPage) {
+    if (!isExpositionPage) {
+      return children;
+    }
+
+    const order = [
+      "EXPOSITION/GALERIE VIRTUELLE",
+      "EXPOSITION/2026",
+      "EXPOSITION/2025",
+      "EXPOSITION/2024 & avant"
+    ];
+
+    return [...children].sort((first, second) => {
+      const firstIndex = order.indexOf(normalizePath(first.path));
+      const secondIndex = order.indexOf(normalizePath(second.path));
+      return (firstIndex === -1 ? order.length : firstIndex) - (secondIndex === -1 ? order.length : secondIndex);
+    });
+  }
+
   function renderGallery(container, images) {
     if (!images.length) {
       container.className = "empty";
@@ -251,6 +270,11 @@
       return;
     }
 
+    if (state.pagePath === "SCULPTURE") {
+      layoutSculptureGallery(container, items);
+      return;
+    }
+
     const isCvPage = state.pagePath === "PARCOURS/CV";
     const gap = window.matchMedia("(max-width: 700px)").matches ? 16 : 22;
     const cvScale = isCvPage ? 2 : 1;
@@ -304,6 +328,108 @@
     });
   }
 
+  function layoutSculptureGallery(container, items) {
+    const isMobile = window.matchMedia("(max-width: 700px)").matches;
+    const gap = isMobile ? 16 : 22;
+    const height = isMobile ? 180 : 260;
+    const availableWidth = container.clientWidth || container.getBoundingClientRect().width;
+    const maxImagesPerRow = isMobile ? 2 : 4;
+    const orderedItems = shuffle(items);
+    const rows = [];
+    let index = 0;
+
+    while (index < orderedItems.length) {
+      const row = [];
+      const remaining = orderedItems.length - index;
+      const wantedCount = chooseSculptureRowCount(remaining, maxImagesPerRow);
+      let rowWidth = 0;
+
+      while (index < orderedItems.length && row.length < wantedCount) {
+        const item = orderedItems[index];
+        const image = item.querySelector("img");
+        const aspect = image && image.naturalWidth && image.naturalHeight
+          ? image.naturalWidth / image.naturalHeight
+          : 1;
+        const width = Math.round(height * aspect);
+        const nextWidth = rowWidth + width + (row.length ? gap : 0);
+
+        if (row.length >= 2 && nextWidth > availableWidth) {
+          break;
+        }
+
+        row.push({ item, aspect, width });
+        rowWidth = nextWidth;
+        index += 1;
+      }
+
+      if (!row.length) {
+        const item = orderedItems[index];
+        row.push({ item, aspect: 1, width: Math.min(height, availableWidth) });
+        index += 1;
+      }
+
+      rows.push(row);
+    }
+
+    container.innerHTML = "";
+
+    rows.forEach((rowItems, rowIndex) => {
+      const rowElement = document.createElement("div");
+      const canAddFrame = rowItems.length < maxImagesPerRow;
+      const addFrame = canAddFrame && Math.random() < 0.42;
+      const framePosition = addFrame ? Math.floor(Math.random() * (rowItems.length + 1)) : -1;
+
+      rowElement.className = "gallery-row sculpture-row";
+
+      rowItems.forEach(({ item, aspect, width }, itemIndex) => {
+        if (itemIndex === framePosition) {
+          rowElement.appendChild(createSculptureFrame(height, rowIndex));
+        }
+
+        item.style.width = `${Math.min(width, availableWidth)}px`;
+        item.style.height = `${height}px`;
+        item.style.flex = "0 0 auto";
+        rowElement.appendChild(item);
+
+        if (itemIndex === rowItems.length - 1 && framePosition === rowItems.length) {
+          rowElement.appendChild(createSculptureFrame(height, rowIndex));
+        }
+      });
+
+      container.appendChild(rowElement);
+    });
+  }
+
+  function chooseSculptureRowCount(remaining, maxImagesPerRow) {
+    if (remaining <= maxImagesPerRow && remaining !== 1) {
+      return remaining;
+    }
+
+    if (remaining === 4) {
+      return 2;
+    }
+
+    const count = 2 + Math.floor(Math.random() * (maxImagesPerRow - 1));
+    return remaining - count === 1 ? 2 : count;
+  }
+
+  function createSculptureFrame(height, rowIndex) {
+    const frame = document.createElement("div");
+    const widthScale = 0.72 + Math.random() * 0.36;
+
+    frame.className = "gallery-frame sculpture-frame";
+    frame.style.width = `${Math.round(height * widthScale)}px`;
+    frame.style.height = `${height}px`;
+    frame.style.flex = "0 0 auto";
+    frame.setAttribute("aria-hidden", "true");
+
+    if (rowIndex % 3 === 1) {
+      frame.classList.add("is-tall-feeling");
+    }
+
+    return frame;
+  }
+
   function startCarousel(container, images) {
     const shuffled = shuffle(images).slice(0, Math.min(images.length, 36));
 
@@ -335,6 +461,11 @@
   }
 
   function collectImages(node, trail = []) {
+    const nodePath = normalizePath(node.path || "");
+    if (nodePath === "PARCOURS/CV" || nodePath === "PARCOURS/Publications") {
+      return [];
+    }
+
     const label = [...trail, node.name].filter(Boolean).join(" / ");
     const images = [];
 

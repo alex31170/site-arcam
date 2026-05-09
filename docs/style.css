@@ -313,11 +313,11 @@ body[data-path="EXPOSITION/GALERIE VIRTUELLE"] .hero-media-link img {
 
 body[data-path="EXPOSITION/GALERIE VIRTUELLE"] .hero-media-link:first-child img {
   width: min(30.4vw, 336px);
-  transform: translateY(-10%);
+  transform: translateY(0.2%);
 }
 
 body[data-path="EXPOSITION/GALERIE VIRTUELLE"] .hero-media-link:nth-child(2) img {
-  width: min(35vw, 380px);
+  width: min(31.5vw, 342px);
   transform: translateY(0.2%);
 }
 
@@ -383,7 +383,7 @@ body[data-path="EXPOSITION"] #children-grid .card[href$="GALERIE%20VIRTUELLE"] i
 body[data-path="PARCOURS"] #children-grid {
   display: flex;
   justify-content: center;
-  gap: 18px;
+  gap: 4cm;
 }
 
 body[data-path="PARCOURS"] #children-grid .card {
@@ -396,6 +396,33 @@ body[data-path="PARCOURS"] #children-grid .card img {
   aspect-ratio: 1 / 1;
   border-radius: 50%;
   object-fit: cover;
+}
+
+body[data-path="PEINTURE"] #children-grid .card img {
+  width: min(7cm, 100%);
+  height: min(7cm, calc((100vw - 50px) / 2));
+  aspect-ratio: 1 / 1;
+  margin: 0 auto;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+body[data-path="PEINTURE"] #children-grid .card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+body[data-path="PEINTURE"] #children-grid .card span {
+  order: -1;
+  width: auto;
+  min-height: 7cm;
+  padding: 0;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-align: center;
+  white-space: nowrap;
 }
 
 .gallery {
@@ -430,6 +457,26 @@ body[data-path="PARCOURS"] #children-grid .card img {
 
 .gallery-item:hover img {
   transform: scale(1.04);
+}
+
+body[data-path="SCULPTURE"] .gallery {
+  align-items: center;
+}
+
+body[data-path="SCULPTURE"] .gallery-row {
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+}
+
+body[data-path="SCULPTURE"] .gallery-frame {
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  background: #000000;
+}
+
+body[data-path="SCULPTURE"] .gallery-item img {
+  object-fit: contain;
 }
 
 .documents {
@@ -503,6 +550,39 @@ body[data-path="PARCOURS"] #children-grid .card img {
 }
 
 @media (max-width: 700px) {
+  .header-brand {
+    width: min(100% - 22px, 1160px);
+    min-height: auto;
+    padding-top: 28px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  .header-signature {
+    max-width: 100%;
+    font-size: clamp(86px, 30vw, 130px);
+    text-align: center;
+    overflow-wrap: break-word;
+  }
+
+  .header-brand-visual {
+    width: min(54vw, 190px);
+  }
+
+  .header-artist-row {
+    width: min(100% - 22px, 1160px);
+    justify-content: center;
+  }
+
+  .header-artist {
+    width: 100%;
+    margin-top: 10px;
+    font-size: 24px;
+    text-align: center;
+  }
+
   .wrap {
     width: min(100% - 22px, 1160px);
   }
@@ -523,6 +603,10 @@ body[data-path="PARCOURS"] #children-grid .card img {
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
+  }
+
+  body[data-path="PEINTURE"] #children-grid {
+    grid-template-columns: 1fr;
   }
 
   .gallery {
@@ -551,7 +635,7 @@ body[data-path="PARCOURS"] #children-grid .card img {
   }
 
   body[data-path="EXPOSITION/GALERIE VIRTUELLE"] .hero-media-link:nth-child(2) img {
-    width: min(52.8vw, 336px);
+    width: min(47.52vw, 302px);
   }
 
   body[data-path="EXPOSITION/GALERIE VIRTUELLE"] .hero-media-link:first-child img {
